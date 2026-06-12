@@ -8,6 +8,19 @@ const pdfParse = require('pdf-parse');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Decode HTML entities
+function decodeHtmlEntities(text) {
+  const entities = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&ndash;': '–'
+  };
+  return text.replace(/&[a-zA-Z#]+;/g, match => entities[match] || match);
+}
+
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
@@ -147,7 +160,7 @@ function parseStGeorges(html) {
     const date = dateRaw ? new Date(dateRaw) : null;
     if (date && !isNaN(date.getTime()) && date < now) continue;
     const catMatch = card.match(/c-col-card__taxonomy[\s\S]*?<span>([^<]+)<\/span>/);
-    const category = catMatch ? catMatch[1].trim() : '';
+    const category = catMatch ? decodeHtmlEntities(catMatch[1].trim()) : '';
     const hrefMatch = card.match(/href="([^"]+)"/);
     const bookMatch = card.match(/href="([^"]*\/book[^"]*)"/);
     const url = bookMatch ? bookMatch[1] : (hrefMatch ? hrefMatch[1] : '');
