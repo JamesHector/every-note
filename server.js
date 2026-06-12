@@ -65,6 +65,14 @@ function httpsFetch(url, timeoutMs = 15000) {
   });
 }
 
+function normalizeVenue(venue) {
+  // Normalize venue names to handle variations
+  if (venue.includes('Bristol Beacon') || venue.includes('Lantern Hall')) {
+    return 'Bristol Beacon';
+  }
+  return venue;
+}
+
 function parseBristolJazz(html) {
   const startIdx = html.indexOf('events: [');
   if (startIdx === -1) return [];
@@ -84,14 +92,15 @@ function parseBristolJazz(html) {
       .map(e => {
         const desc = e.description || '';
         const venuePart = desc.split(/<br\s*\/?>|\n/i)[0];
-        const venue = venuePart.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim();
+        let venue = venuePart.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim();
+        venue = normalizeVenue(venue) || 'Bristol Jazz Live';
         const hrefMatch = desc.match(/href="([^"]+)"/);
         const plainUrl = desc.match(/https?:\/\/[^\s<"]+/);
         const url = hrefMatch ? hrefMatch[1] : (plainUrl ? plainUrl[0] : '');
         return {
           title: e.title,
           date: e.start,
-          venue: venue || 'Bristol Jazz Live',
+          venue,
           url,
           source: 'Bristol Jazz Live',
           category: 'Jazz'
