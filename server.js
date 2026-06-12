@@ -220,11 +220,21 @@ function getGigs(filters = {}) {
       params.push(filters.endDate);
     }
 
-    // Venue filter
+    // Venue filter - normalize the filter values
     if (filters.venues && filters.venues.length > 0) {
-      const placeholders = filters.venues.map(() => '?').join(',');
-      query += ` AND venue IN (${placeholders})`;
-      params.push(...filters.venues);
+      // Build OR conditions to match normalized venues
+      const venueClauses = filters.venues.map(() => 'venue LIKE ? OR venue LIKE ? OR venue LIKE ?').join(' OR ');
+      query += ` AND (${venueClauses})`;
+      // Add all variations for each venue
+      filters.venues.forEach(v => {
+        if (v.includes('George')) {
+          params.push('%george%', '%george%', '%george%');
+        } else if (v.includes('Beacon')) {
+          params.push('%beacon%', '%beacon%', '%lantern%');
+        } else {
+          params.push(v, v, v);
+        }
+      });
     }
 
     // Genre/Category filter
@@ -245,7 +255,9 @@ function getGigs(filters = {}) {
 
     db.all(query, params, (err, rows) => {
       if (err) return reject(err);
-      resolve(rows || []);
+      // Normalize venue names in results
+      const normalized = (rows || []).map(r => ({...r, venue: normalizeVenue(r.venue)}));
+      resolve(normalized);
     });
   });
 }
@@ -254,7 +266,10 @@ function getVenues() {
   return new Promise((resolve, reject) => {
     db.all('SELECT DISTINCT venue FROM gigs ORDER BY venue', (err, rows) => {
       if (err) return reject(err);
-      resolve((rows || []).map(r => r.venue));
+      // Apply normalization to display venues consistently
+      const venues = (rows || []).map(r => normalizeVenue(r.venue));
+      // Remove duplicates
+      resolve([...new Set(venues)].sort());
     });
   });
 }
