@@ -4,11 +4,9 @@ const path = require('path');
 const https = require('https');
 const bodyParser = require('body-parser');
 const pdfParse = require('pdf-parse');
-const { Anthropic } = require('anthropic');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const client = new Anthropic();
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
