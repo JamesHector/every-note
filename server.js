@@ -240,8 +240,8 @@ function getGigs(filters = {}) {
     db.all(query, params, (err, rows) => {
       if (err) return reject(err);
 
-      // Get all gigs and apply venue filter in JavaScript
-      let results = rows || [];
+      // Get all gigs, filter out placeholder venues, and apply venue filter in JavaScript
+      let results = (rows || []).filter(r => r.venue && !r.venue.toLowerCase().includes('check venue'));
 
       // Venue filter - match after normalizing both sides
       if (filters.venues && filters.venues.length > 0) {
