@@ -207,6 +207,7 @@ function insertGigs(gigs) {
 
 function getGigs(filters = {}) {
   return new Promise((resolve, reject) => {
+    // Start with all gigs
     let query = 'SELECT * FROM gigs WHERE 1=1';
     const params = [];
 
@@ -218,23 +219,6 @@ function getGigs(filters = {}) {
     if (filters.endDate) {
       query += ' AND date <= ?';
       params.push(filters.endDate);
-    }
-
-    // Venue filter - normalize the filter values
-    if (filters.venues && filters.venues.length > 0) {
-      // Build OR conditions to match normalized venues
-      const venueClauses = filters.venues.map(() => 'venue LIKE ? OR venue LIKE ? OR venue LIKE ?').join(' OR ');
-      query += ` AND (${venueClauses})`;
-      // Add all variations for each venue
-      filters.venues.forEach(v => {
-        if (v.includes('George')) {
-          params.push('%george%', '%george%', '%george%');
-        } else if (v.includes('Beacon')) {
-          params.push('%beacon%', '%beacon%', '%lantern%');
-        } else {
-          params.push(v, v, v);
-        }
-      });
     }
 
     // Genre/Category filter
@@ -255,8 +239,23 @@ function getGigs(filters = {}) {
 
     db.all(query, params, (err, rows) => {
       if (err) return reject(err);
+
+      // Get all gigs and apply venue filter in JavaScript
+      let results = rows || [];
+
+      // Venue filter - match after normalizing both sides
+      if (filters.venues && filters.venues.length > 0) {
+        results = results.filter(gig => {
+          const normalizedGigVenue = normalizeVenue(gig.venue);
+          return filters.venues.some(selectedVenue => {
+            const normalizedSelected = normalizeVenue(selectedVenue);
+            return normalizedGigVenue === normalizedSelected;
+          });
+        });
+      }
+
       // Normalize venue names in results
-      const normalized = (rows || []).map(r => ({...r, venue: normalizeVenue(r.venue)}));
+      const normalized = results.map(r => ({...r, venue: normalizeVenue(r.venue)}));
       resolve(normalized);
     });
   });
