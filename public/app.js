@@ -46,36 +46,36 @@ async function loadGenres() {
 
 function renderGenreFilters() {
   const container = document.getElementById('genreFilters');
-  container.innerHTML = allGenres.map(genre => `
+  container.innerHTML = allGenres.map((genre, idx) => `
     <div class="genre-checkbox">
       <input
         type="checkbox"
-        id="genre-${genre}"
+        id="genre-${idx}"
         value="${genre}"
-        onchange="toggleGenre('${genre}')"
+        onchange="toggleGenre(this)"
       >
-      <label for="genre-${genre}">${genre}</label>
+      <label for="genre-${idx}">${genre}</label>
     </div>
   `).join('');
 }
 
 function renderVenueFilters() {
   const container = document.getElementById('venueFilters');
-  container.innerHTML = allVenues.map(venue => `
+  container.innerHTML = allVenues.map((venue, idx) => `
     <div class="venue-checkbox">
       <input
         type="checkbox"
-        id="venue-${venue}"
+        id="venue-${idx}"
         value="${venue}"
-        onchange="toggleVenue('${venue}')"
+        onchange="toggleVenue(this)"
       >
-      <label for="venue-${venue}">${venue}</label>
+      <label for="venue-${idx}">${venue}</label>
     </div>
   `).join('');
 }
 
-function toggleGenre(genre) {
-  const checkbox = document.getElementById(`genre-${genre}`);
+function toggleGenre(checkbox) {
+  const genre = checkbox.value;
   if (checkbox.checked) {
     selectedGenres.push(genre);
   } else {
@@ -84,8 +84,8 @@ function toggleGenre(genre) {
   loadGigs();
 }
 
-function toggleVenue(venue) {
-  const checkbox = document.getElementById(`venue-${venue}`);
+function toggleVenue(checkbox) {
+  const venue = checkbox.value;
   if (checkbox.checked) {
     selectedVenues.push(venue);
   } else {
