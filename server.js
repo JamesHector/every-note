@@ -3,9 +3,12 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const https = require('https');
 const bodyParser = require('body-parser');
+const pdfParse = require('pdf-parse');
+const { Anthropic } = require('anthropic');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const client = new Anthropic();
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
@@ -174,9 +177,23 @@ async function fetchAllGigs() {
     if (jazz.status === 'fulfilled') gigs.push(...parseBristolJazz(jazz.value || ''));
     if (george.status === 'fulfilled') gigs.push(...parseStGeorges(george.value || ''));
 
+    // Add Bar Lotte gigs (placeholder for now - PDF parsing coming soon)
+    const barLotte = await parseBarLottePDF();
+    gigs.push(...barLotte);
+
     return gigs;
   } catch (e) {
     console.error('Error fetching gigs:', e.message);
+    return [];
+  }
+}
+
+async function parseBarLottePDF() {
+  try {
+    console.log('Bar Lotte gig fetching: PDF parsing not yet implemented - manual submission coming soon');
+    return [];
+  } catch (e) {
+    console.error('Error parsing Bar Lotte PDF:', e.message);
     return [];
   }
 }
@@ -211,18 +228,21 @@ function getGigs(filters = {}) {
     let query = 'SELECT * FROM gigs WHERE 1=1';
     const params = [];
 
-    // Date filter
-    if (filters.startDate) {
+    // If venue is selected, ignore date and genre filters
+    const venueSelected = filters.venues && filters.venues.length > 0;
+
+    // Date filter (skip if venue selected)
+    if (!venueSelected && filters.startDate) {
       query += ' AND date >= ?';
       params.push(filters.startDate);
     }
-    if (filters.endDate) {
+    if (!venueSelected && filters.endDate) {
       query += ' AND date <= ?';
       params.push(filters.endDate);
     }
 
-    // Genre/Category filter
-    if (filters.genres && filters.genres.length > 0) {
+    // Genre/Category filter (skip if venue selected)
+    if (!venueSelected && filters.genres && filters.genres.length > 0) {
       const placeholders = filters.genres.map(() => '?').join(',');
       query += ` AND category IN (${placeholders})`;
       params.push(...filters.genres);
