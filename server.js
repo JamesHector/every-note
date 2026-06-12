@@ -239,7 +239,7 @@ function getGigs(filters = {}) {
     let query = 'SELECT * FROM gigs WHERE 1=1';
     const params = [];
 
-    // If venue is selected, ignore date and genre filters
+    // If venue is selected, ignore date filters but still apply genre filters
     const venueSelected = filters.venues && filters.venues.length > 0;
 
     // Date filter (skip if venue selected)
@@ -252,8 +252,8 @@ function getGigs(filters = {}) {
       params.push(filters.endDate);
     }
 
-    // Genre/Category filter (skip if venue selected)
-    if (!venueSelected && filters.genres && filters.genres.length > 0) {
+    // Genre/Category filter (apply regardless of venue selection)
+    if (filters.genres && filters.genres.length > 0) {
       const placeholders = filters.genres.map(() => '?').join(',');
       query += ` AND category IN (${placeholders})`;
       params.push(...filters.genres);
