@@ -66,10 +66,25 @@ function httpsFetch(url, timeoutMs = 15000) {
 }
 
 function normalizeVenue(venue) {
+  // Remove URLs and cruft
+  venue = venue.replace(/https?:\/\/[^\s]+/g, '').trim();
+  venue = venue.replace(/-\s*$/, '').trim();  // Remove trailing dash
+
   // Normalize venue names to handle variations
   if (venue.includes('Bristol Beacon') || venue.includes('Lantern Hall')) {
     return 'Bristol Beacon';
   }
+
+  // Simplify multi-venue festivals
+  if (venue.toLowerCase().includes('various venues')) {
+    return venue.split(/[-–]/)[0].trim();  // Take first part before dash
+  }
+
+  // Limit to reasonable length
+  if (venue.length > 60) {
+    return venue.substring(0, 57) + '...';
+  }
+
   return venue;
 }
 
