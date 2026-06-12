@@ -78,22 +78,26 @@ header p {
   color: #333;
 }
 
+.genre-list,
 .venue-list {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
+.genre-checkbox,
 .venue-checkbox {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
+.genre-checkbox input,
 .venue-checkbox input {
   cursor: pointer;
 }
 
+.genre-checkbox label,
 .venue-checkbox label {
   margin: 0;
   cursor: pointer;

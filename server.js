@@ -93,7 +93,8 @@ function parseBristolJazz(html) {
         const desc = e.description || '';
         const venuePart = desc.split(/<br\s*\/?>|\n/i)[0];
         let venue = venuePart.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim();
-        venue = normalizeVenue(venue) || 'Bristol Jazz Live';
+        // Only apply normalization if venue was extracted, don't use Bristol Jazz Live as fallback
+        venue = normalizeVenue(venue) || 'Check venue';
         const hrefMatch = desc.match(/href="([^"]+)"/);
         const plainUrl = desc.match(/https?:\/\/[^\s<"]+/);
         const url = hrefMatch ? hrefMatch[1] : (plainUrl ? plainUrl[0] : '');
@@ -206,6 +207,13 @@ function getGigs(filters = {}) {
       params.push(...filters.venues);
     }
 
+    // Genre/Category filter
+    if (filters.genres && filters.genres.length > 0) {
+      const placeholders = filters.genres.map(() => '?').join(',');
+      query += ` AND category IN (${placeholders})`;
+      params.push(...filters.genres);
+    }
+
     // Search filter
     if (filters.search) {
       const searchTerm = `%${filters.search}%`;
@@ -231,6 +239,15 @@ function getVenues() {
   });
 }
 
+function getGenres() {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT DISTINCT category FROM gigs WHERE category != "" ORDER BY category', (err, rows) => {
+      if (err) return reject(err);
+      resolve((rows || []).map(r => r.category).filter(c => c));
+    });
+  });
+}
+
 // ============ ROUTES ============
 
 app.get('/api/gigs', async (req, res) => {
@@ -239,6 +256,7 @@ app.get('/api/gigs', async (req, res) => {
       startDate: req.query.startDate,
       endDate: req.query.endDate,
       venues: req.query.venues ? req.query.venues.split(',') : [],
+      genres: req.query.genres ? req.query.genres.split(',') : [],
       search: req.query.search
     };
 
@@ -253,6 +271,15 @@ app.get('/api/venues', async (req, res) => {
   try {
     const venues = await getVenues();
     res.json(venues);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/genres', async (req, res) => {
+  try {
+    const genres = await getGenres();
+    res.json(genres);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

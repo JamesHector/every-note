@@ -1,9 +1,12 @@
 let allVenues = [];
 let selectedVenues = [];
+let allGenres = [];
+let selectedGenres = [];
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   await loadVenues();
+  await loadGenres();
   await loadGigs();
 
   // Setup event listeners
@@ -31,6 +34,31 @@ async function loadVenues() {
   }
 }
 
+async function loadGenres() {
+  try {
+    const response = await fetch('/api/genres');
+    allGenres = await response.json();
+    renderGenreFilters();
+  } catch (e) {
+    console.error('Error loading genres:', e);
+  }
+}
+
+function renderGenreFilters() {
+  const container = document.getElementById('genreFilters');
+  container.innerHTML = allGenres.map(genre => `
+    <div class="genre-checkbox">
+      <input
+        type="checkbox"
+        id="genre-${genre}"
+        value="${genre}"
+        onchange="toggleGenre('${genre}')"
+      >
+      <label for="genre-${genre}">${genre}</label>
+    </div>
+  `).join('');
+}
+
 function renderVenueFilters() {
   const container = document.getElementById('venueFilters');
   container.innerHTML = allVenues.map(venue => `
@@ -44,6 +72,16 @@ function renderVenueFilters() {
       <label for="venue-${venue}">${venue}</label>
     </div>
   `).join('');
+}
+
+function toggleGenre(genre) {
+  const checkbox = document.getElementById(`genre-${genre}`);
+  if (checkbox.checked) {
+    selectedGenres.push(genre);
+  } else {
+    selectedGenres = selectedGenres.filter(g => g !== genre);
+  }
+  loadGigs();
 }
 
 function toggleVenue(venue) {
@@ -67,6 +105,7 @@ async function loadGigs() {
     if (startDate) params.append('startDate', startDate + 'T00:00:00Z');
     if (endDate) params.append('endDate', endDate + 'T23:59:59Z');
     if (selectedVenues.length > 0) params.append('venues', selectedVenues.join(','));
+    if (selectedGenres.length > 0) params.append('genres', selectedGenres.join(','));
 
     const response = await fetch(`/api/gigs?${params}`);
     const gigs = await response.json();
