@@ -70,6 +70,11 @@ function normalizeVenue(venue) {
   venue = venue.replace(/https?:\/\/[^\s]+/g, '').trim();
   venue = venue.replace(/-\s*$/, '').trim();  // Remove trailing dash
 
+  // Normalize St George's variations
+  if (venue.toLowerCase().includes('st george')) {
+    return 'St George\'s Bristol';
+  }
+
   // Normalize venue names to handle variations
   if (venue.includes('Bristol Beacon') || venue.includes('Lantern Hall')) {
     return 'Bristol Beacon';
