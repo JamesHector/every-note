@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Every Note — Bristol Gigs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎵 Every Note</h1>
+      <p>Bristol gigs you don't want to miss</p>
+    </header>
+
+    <div class="controls">
+      <input
+        type="text"
+        id="searchBox"
+        class="search-box"
+        placeholder="Search by band, venue, or genre..."
+      >
+
+      <div class="filters">
+        <div class="filter-group">
+          <label>Venues:</label>
+          <div id="venueFilters" class="venue-list"></div>
+        </div>
+
+        <div class="filter-group">
+          <label>Date range:</label>
+          <input
+            type="date"
+            id="startDate"
+            class="date-input"
+          >
+          <span>to</span>
+          <input
+            type="date"
+            id="endDate"
+            class="date-input"
+          >
+          <button onclick="resetDates()" class="btn-reset">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="gigsList" class="gigs-grid">
+      <p>Loading gigs...</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
