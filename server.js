@@ -298,7 +298,8 @@ function getGigs(filters = {}) {
 
         // Filter out unwanted entries
         if (venueLower.includes('check venue')) return false;
-        if (venueLower.includes('new festival')) return false;
+        if (venueLower.includes('celebrating nat king cole')) return false;
+        if (venueLower.includes('various venues')) return false;  // Filter out festival entries
         if (titleLower.includes('celebrating nat king cole')) return false;
 
         return true;
