@@ -271,8 +271,19 @@ function getGigs(filters = {}) {
     db.all(query, params, (err, rows) => {
       if (err) return reject(err);
 
-      // Get all gigs, filter out placeholder venues, and apply venue filter in JavaScript
-      let results = (rows || []).filter(r => r.venue && !r.venue.toLowerCase().includes('check venue'));
+      // Get all gigs, filter out placeholder/unwanted entries, and apply venue filter in JavaScript
+      let results = (rows || []).filter(r => {
+        if (!r.venue) return false;
+        const venueLower = r.venue.toLowerCase();
+        const titleLower = r.title.toLowerCase();
+
+        // Filter out unwanted entries
+        if (venueLower.includes('check venue')) return false;
+        if (venueLower.includes('new festival')) return false;
+        if (titleLower.includes('celebrating nat king cole')) return false;
+
+        return true;
+      });
 
       // Venue filter - match after normalizing both sides
       if (filters.venues && filters.venues.length > 0) {
