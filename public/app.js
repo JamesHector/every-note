@@ -2,9 +2,42 @@ let allVenues = [];
 let selectedVenues = [];
 let allGenres = [];
 let selectedGenres = [];
+let currentUserName = null;
+
+// localStorage management
+function initializeUser() {
+  currentUserName = localStorage.getItem('gigEveryNoteUserName');
+  if (!currentUserName) {
+    showNameModal();
+  }
+}
+
+function showNameModal() {
+  document.getElementById('nameModal').style.display = 'flex';
+  document.getElementById('nameInput').focus();
+  document.getElementById('nameInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') saveName();
+  });
+}
+
+function saveName() {
+  const name = document.getElementById('nameInput').value.trim();
+  if (name.length === 0) {
+    alert('Please enter your name');
+    return;
+  }
+  if (name.length > 100) {
+    alert('Name is too long (max 100 characters)');
+    return;
+  }
+  localStorage.setItem('gigEveryNoteUserName', name);
+  currentUserName = name;
+  document.getElementById('nameModal').style.display = 'none';
+}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
+  initializeUser();
   await loadVenues();
   await loadGenres();
   await loadGigs();
@@ -140,18 +173,53 @@ function renderGigs(gigs) {
         </div>
         ${gig.category ? `<div class="gig-category">${escapeHtml(gig.category)}</div>` : ''}
         <div class="gig-source">${escapeHtml(gig.source)}</div>
+        <div id="interested-${gig.id}" class="gig-interested"></div>
         <div class="gig-footer">
           ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
-          <button class="btn btn-secondary" onclick="addToInterest('${escapeHtml(gig.title)}')">Interested</button>
+          <button class="btn btn-secondary" onclick="addToInterest(${gig.id}, '${escapeHtml(gig.title)}')">Interested</button>
         </div>
       </div>
     `;
   }).join('');
+
+  // Load interested users for each gig
+  gigs.forEach(gig => {
+    loadInterestedUsers(gig.id);
+  });
 }
 
-function addToInterest(gigTitle) {
-  // TODO: Implement in Phase 3
-  alert(`Marked "${gigTitle}" as interested (feature coming soon)`);
+function loadInterestedUsers(gigId) {
+  fetch(`/api/interested/${gigId}`)
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById(`interested-${gigId}`);
+      if (container && data.interested.length > 0) {
+        container.innerHTML = `👥 Interested: ${escapeHtml(data.interested.join(', '))}`;
+      }
+    })
+    .catch(e => console.error('Error loading interested users:', e));
+}
+
+function addToInterest(gigId, gigTitle) {
+  if (!currentUserName) {
+    showNameModal();
+    return;
+  }
+
+  fetch('/api/interested', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gigId, userName: currentUserName })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        loadInterestedUsers(gigId);
+      } else {
+        console.error('Error marking interest:', data.error);
+      }
+    })
+    .catch(e => console.error('Error:', e));
 }
 
 function resetDates() {

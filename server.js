@@ -43,6 +43,14 @@ db.serialize(() => {
     description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS interested (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gig_id INTEGER NOT NULL,
+    user_name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(gig_id, user_name)
+  )`);
 });
 
 // ============ GIG SCRAPERS (from Speaker Web) ============
@@ -352,6 +360,33 @@ function getGenres() {
   });
 }
 
+function addInterest(gigId, userName) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT OR IGNORE INTO interested (gig_id, user_name) VALUES (?, ?)',
+      [gigId, userName],
+      function(err) {
+        if (err) return reject(err);
+        resolve({ success: true });
+      }
+    );
+  });
+}
+
+function getInterested(gigId) {
+  return new Promise((resolve, reject) => {
+    db.all(
+      'SELECT user_name FROM interested WHERE gig_id = ? ORDER BY created_at ASC',
+      [gigId],
+      (err, rows) => {
+        if (err) return reject(err);
+        const names = (rows || []).map(r => r.user_name);
+        resolve(names);
+      }
+    );
+  });
+}
+
 // ============ ROUTES ============
 
 app.get('/api/gigs', async (req, res) => {
@@ -384,6 +419,40 @@ app.get('/api/genres', async (req, res) => {
   try {
     const genres = await getGenres();
     res.json(genres);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/interested', async (req, res) => {
+  try {
+    const { gigId, userName } = req.body;
+
+    if (!gigId || !userName) {
+      return res.status(400).json({ error: 'gigId and userName required' });
+    }
+
+    if (userName.trim().length === 0) {
+      return res.status(400).json({ error: 'Name cannot be empty' });
+    }
+
+    // Limit name length to prevent abuse
+    if (userName.length > 100) {
+      return res.status(400).json({ error: 'Name too long (max 100 chars)' });
+    }
+
+    const result = await addInterest(gigId, userName.trim());
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/interested/:gigId', async (req, res) => {
+  try {
+    const gigId = req.params.gigId;
+    const names = await getInterested(gigId);
+    res.json({ gigId: parseInt(gigId), interested: names });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
