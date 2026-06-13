@@ -327,8 +327,16 @@ function getVenues() {
   return new Promise((resolve, reject) => {
     db.all('SELECT DISTINCT venue FROM gigs ORDER BY venue', (err, rows) => {
       if (err) return reject(err);
-      // Apply normalization to display venues consistently
-      const venues = (rows || []).map(r => normalizeVenue(r.venue));
+      // Filter out unwanted venues and normalize
+      const venues = (rows || [])
+        .filter(r => {
+          const venueLower = r.venue.toLowerCase();
+          if (venueLower.includes('check')) return false;
+          if (venueLower.includes('celebrating')) return false;
+          if (venueLower.includes('various') || venueLower.includes('festival')) return false;
+          return true;
+        })
+        .map(r => normalizeVenue(r.venue));
       // Remove duplicates
       resolve([...new Set(venues)].sort());
     });
