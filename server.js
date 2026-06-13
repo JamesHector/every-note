@@ -458,6 +458,40 @@ app.get('/api/interested/:gigId', async (req, res) => {
   }
 });
 
+app.get('/api/attendance-summary', async (req, res) => {
+  try {
+    // Get all gigs with interested users
+    const gigs = await new Promise((resolve, reject) => {
+      db.all('SELECT id, title, date, venue FROM gigs ORDER BY date ASC', async (err, rows) => {
+        if (err) return reject(err);
+
+        // Get interested users for each gig
+        const gigsWithInterested = await Promise.all(
+          (rows || []).map(async gig => {
+            const interested = await getInterested(gig.id);
+            return { ...gig, interested };
+          })
+        );
+
+        resolve(gigsWithInterested);
+      });
+    });
+
+    // Get all unique user names
+    const allNames = new Set();
+    gigs.forEach(gig => {
+      gig.interested.forEach(name => allNames.add(name));
+    });
+
+    res.json({
+      gigs,
+      allNames: Array.from(allNames).sort()
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============ BACKGROUND GIG REFRESH ============
 
 async function refreshGigs() {

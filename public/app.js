@@ -222,6 +222,58 @@ function addToInterest(gigId, gigTitle) {
     .catch(e => console.error('Error:', e));
 }
 
+function showAttendanceModal() {
+  document.getElementById('attendanceModal').style.display = 'flex';
+  loadAttendanceSummary();
+}
+
+function closeAttendanceModal() {
+  document.getElementById('attendanceModal').style.display = 'none';
+}
+
+function loadAttendanceSummary() {
+  fetch('/api/attendance-summary')
+    .then(res => res.json())
+    .then(data => {
+      renderAttendanceTable(data.gigs, data.allNames);
+    })
+    .catch(e => console.error('Error loading attendance:', e));
+}
+
+function renderAttendanceTable(gigs, allNames) {
+  const container = document.getElementById('attendanceTable');
+
+  if (allNames.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: #999;">No one has marked interest yet</p>';
+    return;
+  }
+
+  // Build HTML table
+  let html = '<table class="attendance-table"><thead><tr><th>Gig</th>';
+  allNames.forEach(name => {
+    html += `<th>${escapeHtml(name)}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  gigs.forEach(gig => {
+    const date = new Date(gig.date);
+    const dateStr = date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+    const title = escapeHtml(gig.title.substring(0, 40));
+
+    html += `<tr><td><strong>${title}</strong><br><span style="font-size: 0.85em; color: #999;">${dateStr}</span></td>`;
+
+    allNames.forEach(name => {
+      const interested = gig.interested.includes(name);
+      html += `<td>${interested ? '<span class="attendance-checkmark">✓</span>' : ''}</td>`;
+    });
+
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
 function resetDates() {
   const today = new Date();
   const threeMonthsAhead = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
