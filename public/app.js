@@ -139,6 +139,7 @@ function renderGigs(gigs) {
           <span style="color: #999;">at ${timeStr}</span>
         </div>
         ${gig.category ? `<div class="gig-category">${escapeHtml(gig.category)}</div>` : ''}
+        ${gig.description ? `<div class="gig-description">${escapeHtml(gig.description)}</div>` : ''}
         <div class="gig-source">${escapeHtml(gig.source)}</div>
         <div class="gig-footer">
           ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}

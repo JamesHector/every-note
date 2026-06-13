@@ -40,6 +40,7 @@ db.serialize(() => {
     url TEXT,
     source TEXT,
     category TEXT,
+    description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 });
@@ -132,13 +133,26 @@ function parseBristolJazz(html) {
         const hrefMatch = desc.match(/href="([^"]+)"/);
         const plainUrl = desc.match(/https?:\/\/[^\s<"]+/);
         const url = hrefMatch ? hrefMatch[1] : (plainUrl ? plainUrl[0] : '');
+
+        // Extract and clean description for display
+        let cleanDesc = '';
+        if (e.description) {
+          cleanDesc = e.description
+            .replace(/<[^>]+>/g, '')  // Remove HTML tags
+            .replace(/https?:\/\/[^\s]+/g, '')  // Remove URLs
+            .replace(/\s+/g, ' ')  // Normalize whitespace
+            .trim()
+            .substring(0, 200);  // Limit length
+        }
+
         return {
           title: e.title,
           date: e.start,
           venue,
           url,
           source: 'Bristol Jazz Live',
-          category: 'Jazz'
+          category: 'Jazz',
+          description: cleanDesc
         };
       });
   } catch { return []; }
@@ -165,13 +179,18 @@ function parseStGeorges(html) {
     const bookMatch = card.match(/href="([^"]*\/book[^"]*)"/);
     const url = bookMatch ? bookMatch[1] : (hrefMatch ? hrefMatch[1] : '');
 
+    // Try to extract description from the card
+    const descMatch = card.match(/c-col-card__desc[^>]*>([^<]+)<\/div/i);
+    const description = descMatch ? descMatch[1].trim().substring(0, 300) : '';
+
     events.push({
       title,
       date: date ? date.toISOString() : dateRaw,
       venue: 'St George\'s Bristol',
       url,
       source: 'St George\'s Bristol',
-      category
+      category,
+      description
     });
   }
   return events;
@@ -217,10 +236,10 @@ function insertGigs(gigs) {
     db.run('DELETE FROM gigs', (err) => {
       if (err) return reject(err);
 
-      const stmt = db.prepare('INSERT INTO gigs (title, date, venue, url, source, category) VALUES (?, ?, ?, ?, ?, ?)');
+      const stmt = db.prepare('INSERT INTO gigs (title, date, venue, url, source, category, description) VALUES (?, ?, ?, ?, ?, ?, ?)');
 
       gigs.forEach(g => {
-        stmt.run([g.title, g.date, g.venue, g.url, g.source, g.category], (err) => {
+        stmt.run([g.title, g.date, g.venue, g.url, g.source, g.category, g.description || ''], (err) => {
           if (err) console.error('Insert error:', err);
         });
       });

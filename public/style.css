@@ -183,6 +183,17 @@ header p {
   margin-bottom: 12px;
 }
 
+.gig-description {
+  font-size: 0.9em;
+  color: #666;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: #fafafa;
+  border-left: 3px solid #667eea;
+  border-radius: 2px;
+}
+
 .gig-source {
   font-size: 0.8em;
   color: #999;
