@@ -48,9 +48,15 @@ db.serialize(() => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     gig_id INTEGER NOT NULL,
     user_name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'interested',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(gig_id, user_name)
   )`);
+
+  // Migration: add status column to existing table (safe if already exists)
+  db.run(`ALTER TABLE interested ADD COLUMN status TEXT NOT NULL DEFAULT 'interested'`, () => {
+    // Silently ignore if column already exists
+  });
 });
 
 // ============ GIG SCRAPERS (from Speaker Web) ============
@@ -360,10 +366,23 @@ function getGenres() {
   });
 }
 
-function addInterest(gigId, userName) {
+function addInterest(gigId, userName, status = 'interested') {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT OR IGNORE INTO interested (gig_id, user_name) VALUES (?, ?)',
+      'INSERT INTO interested (gig_id, user_name, status) VALUES (?, ?, ?) ON CONFLICT(gig_id, user_name) DO UPDATE SET status = excluded.status',
+      [gigId, userName, status],
+      function(err) {
+        if (err) return reject(err);
+        resolve({ success: true });
+      }
+    );
+  });
+}
+
+function removeInterest(gigId, userName) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'DELETE FROM interested WHERE gig_id = ? AND user_name = ?',
       [gigId, userName],
       function(err) {
         if (err) return reject(err);
@@ -376,12 +395,12 @@ function addInterest(gigId, userName) {
 function getInterested(gigId) {
   return new Promise((resolve, reject) => {
     db.all(
-      'SELECT user_name FROM interested WHERE gig_id = ? ORDER BY created_at ASC',
+      'SELECT user_name, status FROM interested WHERE gig_id = ? ORDER BY created_at ASC',
       [gigId],
       (err, rows) => {
         if (err) return reject(err);
-        const names = (rows || []).map(r => r.user_name);
-        resolve(names);
+        const interested = (rows || []).map(r => ({ userName: r.user_name, status: r.status }));
+        resolve(interested);
       }
     );
   });
@@ -426,7 +445,7 @@ app.get('/api/genres', async (req, res) => {
 
 app.post('/api/interested', async (req, res) => {
   try {
-    const { gigId, userName } = req.body;
+    const { gigId, userName, status = 'interested' } = req.body;
 
     if (!gigId || !userName) {
       return res.status(400).json({ error: 'gigId and userName required' });
@@ -441,7 +460,13 @@ app.post('/api/interested', async (req, res) => {
       return res.status(400).json({ error: 'Name too long (max 100 chars)' });
     }
 
-    const result = await addInterest(gigId, userName.trim());
+    // Validate status
+    const validStatuses = ['interested', 'booked', 'going'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const result = await addInterest(gigId, userName.trim(), status);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -451,8 +476,23 @@ app.post('/api/interested', async (req, res) => {
 app.get('/api/interested/:gigId', async (req, res) => {
   try {
     const gigId = req.params.gigId;
-    const names = await getInterested(gigId);
-    res.json({ gigId: parseInt(gigId), interested: names });
+    const interested = await getInterested(gigId);
+    res.json({ gigId: parseInt(gigId), interested });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/interested/:gigId/:userName', async (req, res) => {
+  try {
+    const { gigId, userName } = req.params;
+
+    if (!gigId || !userName) {
+      return res.status(400).json({ error: 'gigId and userName required' });
+    }
+
+    const result = await removeInterest(gigId, decodeURIComponent(userName));
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -477,14 +517,16 @@ app.get('/api/attendance-summary', async (req, res) => {
       });
     });
 
-    // Get all unique user names
+    // Get all unique user names and convert interested to proper format
     const allNames = new Set();
-    gigs.forEach(gig => {
-      gig.interested.forEach(name => allNames.add(name));
+    const formattedGigs = gigs.map(gig => {
+      const interestedList = gig.interested.map(item => ({ userName: item.userName, status: item.status }));
+      interestedList.forEach(item => allNames.add(item.userName));
+      return { ...gig, interested: interestedList };
     });
 
     res.json({
-      gigs,
+      gigs: formattedGigs,
       allNames: Array.from(allNames).sort()
     });
   } catch (e) {

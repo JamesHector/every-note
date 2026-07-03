@@ -342,6 +342,101 @@ header p {
   font-size: 1.2em;
 }
 
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+
+.status-interested {
+  background: #f59e0b;
+}
+
+.status-booked {
+  background: #3b82f6;
+}
+
+.status-going {
+  background: #10b981;
+}
+
+.status-none {
+  background: #f0f0f0;
+  color: #555;
+}
+
+.gigs-calendar {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: #eee;
+}
+
+.calendar-day {
+  background: white;
+  min-height: 80px;
+  padding: 6px;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: 600;
+  padding: 8px;
+  background: white;
+  color: #333;
+}
+
+.calendar-chip {
+  font-size: 0.7em;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  background: #f0f0f0;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-chip:hover {
+  background: #667eea;
+  color: white;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.view-toggle button {
+  padding: 8px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #f0f0f0;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background 0.3s;
+}
+
+.view-toggle button.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
 @media (max-width: 768px) {
   .attendance-modal-content {
     max-width: 95vw;
@@ -357,5 +452,25 @@ header p {
   .attendance-table td:first-child {
     min-width: 150px;
     font-size: 0.75em;
+  }
+
+  .calendar-day {
+    min-height: 60px;
+    padding: 4px;
+  }
+
+  .calendar-day-header {
+    padding: 6px;
+    font-size: 0.85em;
+  }
+
+  .calendar-chip {
+    font-size: 0.65em;
+    padding: 1px 4px;
+  }
+
+  .view-toggle button {
+    padding: 6px 10px;
+    font-size: 0.8em;
   }
 }

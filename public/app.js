@@ -3,6 +3,13 @@ let selectedVenues = [];
 let allGenres = [];
 let selectedGenres = [];
 let currentUserName = null;
+let currentView = 'grid';
+let currentCalendarDate = new Date();
+
+// Status progression and labels
+const STATUS_ORDER = [null, 'interested', 'booked', 'going'];
+const STATUS_LABELS = { interested: 'Interested', booked: 'Booked', going: 'Going' };
+const STATUS_COLORS = { interested: '#f59e0b', booked: '#3b82f6', going: '#10b981' };
 
 // localStorage management
 function initializeUser() {
@@ -153,6 +160,11 @@ async function loadGigs() {
 function renderGigs(gigs) {
   const container = document.getElementById('gigsList');
 
+  if (currentView === 'calendar') {
+    renderCalendar(gigs);
+    return;
+  }
+
   if (gigs.length === 0) {
     container.innerHTML = '<p class="empty-state">No gigs found. Try adjusting your filters!</p>';
     return;
@@ -176,7 +188,7 @@ function renderGigs(gigs) {
         <div id="interested-${gig.id}" class="gig-interested"></div>
         <div class="gig-footer">
           ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
-          <button class="btn btn-secondary" onclick="addToInterest(${gig.id}, '${escapeHtml(gig.title)}')">Interested</button>
+          <button id="status-btn-${gig.id}" class="btn btn-secondary" onclick="cycleStatus(${gig.id})">Interested</button>
         </div>
       </div>
     `;
@@ -193,33 +205,93 @@ function loadInterestedUsers(gigId) {
     .then(res => res.json())
     .then(data => {
       const container = document.getElementById(`interested-${gigId}`);
-      if (container && data.interested.length > 0) {
-        container.innerHTML = `👥 Interested: ${escapeHtml(data.interested.join(', '))}`;
+      const statusBtn = document.getElementById(`status-btn-${gigId}`);
+
+      if (data.interested && data.interested.length > 0) {
+        // Build attendee list with statuses
+        const attendeeList = data.interested
+          .map(item => {
+            const statusLabel = STATUS_LABELS[item.status] || 'Interested';
+            return `${escapeHtml(item.userName)} (${statusLabel})`;
+          })
+          .join(', ');
+
+        if (container) {
+          container.innerHTML = `👥 ${attendeeList}`;
+        }
+
+        // Update current user's status button
+        if (statusBtn && currentUserName) {
+          const userStatus = data.interested.find(item => item.userName === currentUserName);
+          if (userStatus) {
+            const statusLabel = STATUS_LABELS[userStatus.status] || 'Interested';
+            const statusColor = STATUS_COLORS[userStatus.status] || '#f0f0f0';
+            statusBtn.textContent = statusLabel;
+            statusBtn.style.background = statusColor;
+            statusBtn.style.color = 'white';
+            statusBtn.dataset.status = userStatus.status;
+          } else {
+            statusBtn.textContent = 'Interested';
+            statusBtn.style.background = '#f0f0f0';
+            statusBtn.style.color = '#555';
+            statusBtn.dataset.status = null;
+          }
+        }
+      } else {
+        if (statusBtn) {
+          statusBtn.textContent = 'Interested';
+          statusBtn.style.background = '#f0f0f0';
+          statusBtn.style.color = '#555';
+          statusBtn.dataset.status = null;
+        }
       }
     })
     .catch(e => console.error('Error loading interested users:', e));
 }
 
-function addToInterest(gigId, gigTitle) {
+function cycleStatus(gigId) {
   if (!currentUserName) {
     showNameModal();
     return;
   }
 
-  fetch('/api/interested', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gigId, userName: currentUserName })
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        loadInterestedUsers(gigId);
-      } else {
-        console.error('Error marking interest:', data.error);
-      }
+  const statusBtn = document.getElementById(`status-btn-${gigId}`);
+  const currentStatus = statusBtn?.dataset.status || null;
+  const currentIndex = STATUS_ORDER.indexOf(currentStatus);
+  const nextIndex = (currentIndex + 1) % STATUS_ORDER.length;
+  const nextStatus = STATUS_ORDER[nextIndex];
+
+  if (nextStatus === null) {
+    // Remove interest
+    fetch(`/api/interested/${gigId}/${encodeURIComponent(currentUserName)}`, {
+      method: 'DELETE'
     })
-    .catch(e => console.error('Error:', e));
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          loadInterestedUsers(gigId);
+        } else {
+          console.error('Error removing interest:', data.error);
+        }
+      })
+      .catch(e => console.error('Error:', e));
+  } else {
+    // Add or update interest with new status
+    fetch('/api/interested', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gigId, userName: currentUserName, status: nextStatus })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          loadInterestedUsers(gigId);
+        } else {
+          console.error('Error updating interest:', data.error);
+        }
+      })
+      .catch(e => console.error('Error:', e));
+  }
 }
 
 function showAttendanceModal() {
@@ -263,8 +335,14 @@ function renderAttendanceTable(gigs, allNames) {
     html += `<tr><td><strong>${title}</strong><br><span style="font-size: 0.85em; color: #999;">${dateStr}</span></td>`;
 
     allNames.forEach(name => {
-      const interested = gig.interested.includes(name);
-      html += `<td>${interested ? '<span class="attendance-checkmark">✓</span>' : ''}</td>`;
+      const interested = gig.interested.find(item => item.userName === name);
+      if (interested) {
+        const statusColor = STATUS_COLORS[interested.status] || '#f0f0f0';
+        const statusLabel = STATUS_LABELS[interested.status] || 'Interested';
+        html += `<td><span class="status-badge" style="background: ${statusColor};">${statusLabel}</span></td>`;
+      } else {
+        html += '<td></td>';
+      }
     });
 
     html += '</tr>';
@@ -282,6 +360,108 @@ function resetDates() {
   document.getElementById('endDate').value = threeMonthsAhead.toISOString().split('T')[0];
 
   loadGigs();
+}
+
+function toggleView(view) {
+  currentView = view;
+  const gridBtn = document.getElementById('gridViewBtn');
+  const calBtn = document.getElementById('calViewBtn');
+  const calNav = document.getElementById('calendarNav');
+
+  if (gridBtn) gridBtn.classList.toggle('active', view === 'grid');
+  if (calBtn) calBtn.classList.toggle('active', view === 'calendar');
+  if (calNav) calNav.style.display = view === 'calendar' ? 'flex' : 'none';
+
+  // For calendar view, load without date filters to show all gigs on calendar
+  if (view === 'calendar') {
+    loadCalendarGigs();
+  } else {
+    loadGigs();
+  }
+}
+
+async function loadCalendarGigs() {
+  try {
+    const searchTerm = document.getElementById('searchBox').value;
+    const params = new URLSearchParams();
+    if (searchTerm) params.append('search', searchTerm);
+    // No date range - show all gigs on calendar
+    if (selectedVenues.length > 0) params.append('venues', selectedVenues.join(','));
+    if (selectedGenres.length > 0) params.append('genres', selectedGenres.join(','));
+
+    const response = await fetch(`/api/gigs?${params}`);
+    const gigs = await response.json();
+
+    renderGigs(gigs);
+  } catch (e) {
+    console.error('Error loading calendar gigs:', e);
+    document.getElementById('gigsList').innerHTML = '<p class="empty-state">Error loading gigs</p>';
+  }
+}
+
+function renderCalendar(gigs) {
+  const container = document.getElementById('gigsList');
+  const year = currentCalendarDate.getFullYear();
+  const month = currentCalendarDate.getMonth();
+
+  // Get the first day of the month and number of days
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+
+  // Month title
+  const monthName = firstDay.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const calendarTitle = document.getElementById('calendarTitle');
+  if (calendarTitle) calendarTitle.textContent = monthName;
+
+  // Build calendar grid
+  let html = '<div class="gigs-calendar"><div class="calendar-grid">';
+
+  // Day headers
+  const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  dayHeaders.forEach(day => {
+    html += `<div class="calendar-day-header">${day}</div>`;
+  });
+
+  // Empty cells before month starts
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    html += '<div class="calendar-day"></div>';
+  }
+
+  // Days of month with gigs
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cellDate = new Date(year, month, day);
+    const cellDateStr = cellDate.toISOString().split('T')[0];
+    const daysGigs = gigs.filter(gig => gig.date.split('T')[0] === cellDateStr);
+
+    html += `<div class="calendar-day">
+      <div style="font-weight: 600; margin-bottom: 4px;">${day}</div>`;
+
+    daysGigs.forEach(gig => {
+      html += `<div class="calendar-chip" onclick="showGigPopup(${gig.id})">${escapeHtml(gig.title.substring(0, 20))}</div>`;
+    });
+
+    html += '</div>';
+  }
+
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function changeMonth(offset) {
+  currentCalendarDate.setMonth(currentCalendarDate.getMonth() + offset);
+  loadCalendarGigs();
+}
+
+function showGigPopup(gigId) {
+  // In a real implementation, this would fetch gig details and show a popup
+  // For now, we'll just log it
+  console.log('Show popup for gig:', gigId);
+}
+
+function closeGigPopup() {
+  document.getElementById('gigPopup').style.display = 'none';
 }
 
 function debounce(fn, delay) {
