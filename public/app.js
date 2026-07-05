@@ -234,7 +234,7 @@ function loadInterestedUsers(gigId) {
             statusBtn.textContent = 'Interested';
             statusBtn.style.background = '#f0f0f0';
             statusBtn.style.color = '#555';
-            statusBtn.dataset.status = null;
+            statusBtn.removeAttribute('data-status');
           }
         }
       } else {
@@ -242,7 +242,7 @@ function loadInterestedUsers(gigId) {
           statusBtn.textContent = 'Interested';
           statusBtn.style.background = '#f0f0f0';
           statusBtn.style.color = '#555';
-          statusBtn.dataset.status = null;
+          statusBtn.removeAttribute('data-status');
         }
       }
     })
