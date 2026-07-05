@@ -52,11 +52,6 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(gig_id, user_name)
   )`);
-
-  // Migration: add status column to existing table (safe if already exists)
-  db.run(`ALTER TABLE interested ADD COLUMN status TEXT NOT NULL DEFAULT 'interested'`, () => {
-    // Silently ignore if column already exists
-  });
 });
 
 // ============ GIG SCRAPERS (from Speaker Web) ============
