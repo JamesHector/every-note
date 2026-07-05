@@ -246,20 +246,23 @@ async function parseBarLottePDF() {
 
 function insertGigs(gigs) {
   return new Promise((resolve, reject) => {
-    // Clear old gigs first
-    db.run('DELETE FROM gigs', (err) => {
+    // Insert gigs without deleting old ones - preserves data if a scraper fails
+    // Uses INSERT OR IGNORE to skip duplicates (same title + date + venue)
+    const stmt = db.prepare('INSERT OR IGNORE INTO gigs (title, date, venue, url, source, category, description) VALUES (?, ?, ?, ?, ?, ?, ?)');
+
+    gigs.forEach(g => {
+      stmt.run([g.title, g.date, g.venue, g.url, g.source, g.category, g.description || ''], (err) => {
+        if (err) console.error('Insert error:', err);
+      });
+    });
+
+    stmt.finalize((err) => {
       if (err) return reject(err);
 
-      const stmt = db.prepare('INSERT INTO gigs (title, date, venue, url, source, category, description) VALUES (?, ?, ?, ?, ?, ?, ?)');
-
-      gigs.forEach(g => {
-        stmt.run([g.title, g.date, g.venue, g.url, g.source, g.category, g.description || ''], (err) => {
-          if (err) console.error('Insert error:', err);
-        });
-      });
-
-      stmt.finalize((err) => {
-        if (err) return reject(err);
+      // Clean up gigs that are in the past (older than 30 days ago)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      db.run('DELETE FROM gigs WHERE date < ?', [thirtyDaysAgo], (err) => {
+        if (err) console.error('Cleanup error:', err);
         resolve();
       });
     });
