@@ -10,14 +10,6 @@ A shared gig discovery platform for friends in Bristol. Discover upcoming gigs, 
 
 ## Current Status
 
-### Phase 1 MVP ✅ (Complete)
-- Browse gigs from Bristol Jazz Live & St George's Bristol
-- Filter by venue, date range, genre, search term
-- Mark gigs as interested/booked/going
-- See who else is going to each gig
-- Responsive mobile + desktop
-- Auto-refresh every 6 hours
-
 ### Phase 0 (Foundation) 🔄 (In Progress)
 Migrating from MVP to production-ready:
 - User accounts + authentication (email/password)
@@ -28,6 +20,14 @@ Migrating from MVP to production-ready:
 
 **See:** [PHASE_0_FOUNDATION_PLAN.md](PHASE_0_FOUNDATION_PLAN.md)
 
+### Phase 1 MVP ✅ (Complete)
+- Browse gigs from Bristol Jazz Live & St George's Bristol
+- Filter by venue, date range, genre, search term
+- Mark gigs as interested/booked/going
+- See who else is going to each gig
+- Responsive mobile + desktop
+- Auto-refresh every 6 hours
+
 ---
 
 ## Future Roadmap
@@ -35,6 +35,7 @@ Migrating from MVP to production-ready:
 ### Phase 2: More Gig Sources
 - Bristol Beacon, Thekla, Fleece, SWX
 - jazzata.com, Bandsintown, Songkick
+- Venue email newsletters (scraped from subscribed emails)
 - Ticket price tracking
 
 ### Phase 3: Follow Artists
@@ -46,13 +47,14 @@ Migrating from MVP to production-ready:
 - Users add gigs not yet scraped
 - Moderation workflow
 
-### Phase 5: Calendar View
+### Phase 5: Calendar View ✅ (Complete - basic, refinement deferred)
 - Month view with gigs on dates
-- Better planning UI
+- Previous/next month navigation
+- Respects search/venue/genre filters
 
-### Phase 6: Email Newsletters
-- Weekly digest for your friends' group
-- Personalized by interests
+### Phase 6: Send Email Newsletters to Users
+- Weekly digest for your friends' group (like Songkick sends)
+- Personalized by interests and followed artists
 
 ### Phase 7: APIs & Monetization
 - **Unified gig API** — $X/month for platforms

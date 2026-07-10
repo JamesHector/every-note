@@ -1,12 +1,35 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const https = require('https');
 const bodyParser = require('body-parser');
-const pdfParse = require('pdf-parse');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Supabase setup
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY environment variables are required');
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+app.use(bodyParser.json());
+app.use(express.static('public'));
+
+// Disable caching for API routes
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
+console.log('Connected to Supabase database');
 
 // Decode HTML entities
 function decodeHtmlEntities(text) {
@@ -21,40 +44,7 @@ function decodeHtmlEntities(text) {
   return text.replace(/&[a-zA-Z#]+;/g, match => entities[match] || match);
 }
 
-app.use(bodyParser.json());
-app.use(express.static('public'));
-
-// Database setup
-const db = new sqlite3.Database('./gigs.db', (err) => {
-  if (err) console.error('Database error:', err);
-  else console.log('Connected to SQLite database');
-});
-
-// Initialize database schema
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS gigs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT,
-    date TEXT,
-    venue TEXT,
-    url TEXT,
-    source TEXT,
-    category TEXT,
-    description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS interested (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    gig_id INTEGER NOT NULL,
-    user_name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'interested',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(gig_id, user_name)
-  )`);
-});
-
-// ============ GIG SCRAPERS (from Speaker Web) ============
+// ============ GIG SCRAPERS ============
 
 function httpsGet(url, timeoutMs = 4000) {
   return new Promise((resolve, reject) => {
@@ -90,26 +80,21 @@ function httpsFetch(url, timeoutMs = 15000) {
 }
 
 function normalizeVenue(venue) {
-  // Remove URLs and cruft
   venue = venue.replace(/https?:\/\/[^\s]+/g, '').trim();
-  venue = venue.replace(/-\s*$/, '').trim();  // Remove trailing dash
+  venue = venue.replace(/-\s*$/, '').trim();
 
-  // Normalize St George's variations
   if (venue.toLowerCase().includes('st george')) {
     return 'St George\'s Bristol';
   }
 
-  // Normalize venue names to handle variations
   if (venue.includes('Bristol Beacon') || venue.includes('Lantern Hall')) {
     return 'Bristol Beacon';
   }
 
-  // Simplify multi-venue festivals
   if (venue.toLowerCase().includes('various venues')) {
-    return venue.split(/[-–]/)[0].trim();  // Take first part before dash
+    return venue.split(/[-–]/)[0].trim();
   }
 
-  // Limit to reasonable length
   if (venue.length > 60) {
     return venue.substring(0, 57) + '...';
   }
@@ -137,21 +122,19 @@ function parseBristolJazz(html) {
         const desc = e.description || '';
         const venuePart = desc.split(/<br\s*\/?>|\n/i)[0];
         let venue = venuePart.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim();
-        // Only apply normalization if venue was extracted, don't use Bristol Jazz Live as fallback
         venue = normalizeVenue(venue) || 'Check venue';
         const hrefMatch = desc.match(/href="([^"]+)"/);
         const plainUrl = desc.match(/https?:\/\/[^\s<"]+/);
         const url = hrefMatch ? hrefMatch[1] : (plainUrl ? plainUrl[0] : '');
 
-        // Extract and clean description for display
         let cleanDesc = '';
         if (e.description) {
           cleanDesc = e.description
-            .replace(/<[^>]+>/g, '')  // Remove HTML tags
-            .replace(/https?:\/\/[^\s]+/g, '')  // Remove URLs
-            .replace(/\s+/g, ' ')  // Normalize whitespace
+            .replace(/<[^>]+>/g, '')
+            .replace(/https?:\/\/[^\s]+/g, '')
+            .replace(/\s+/g, ' ')
             .trim()
-            .substring(0, 200);  // Limit length
+            .substring(0, 200);
         }
 
         return {
@@ -160,7 +143,7 @@ function parseBristolJazz(html) {
           venue,
           url,
           source: 'Bristol Jazz Live',
-          category: 'Jazz',
+          genres: JSON.stringify(['Jazz']),
           description: cleanDesc
         };
       });
@@ -188,7 +171,6 @@ function parseStGeorges(html) {
     const bookMatch = card.match(/href="([^"]*\/book[^"]*)"/);
     const url = bookMatch ? bookMatch[1] : (hrefMatch ? hrefMatch[1] : '');
 
-    // Try to extract description from the card
     const descMatch = card.match(/c-col-card__desc[^>]*>([^<]+)<\/div/i);
     const description = descMatch ? descMatch[1].trim().substring(0, 300) : '';
 
@@ -198,7 +180,7 @@ function parseStGeorges(html) {
       venue: 'St George\'s Bristol',
       url,
       source: 'St George\'s Bristol',
-      category,
+      genres: category ? JSON.stringify([category]) : null,
       description
     });
   }
@@ -216,10 +198,6 @@ async function fetchAllGigs() {
     if (jazz.status === 'fulfilled') gigs.push(...parseBristolJazz(jazz.value || ''));
     if (george.status === 'fulfilled') gigs.push(...parseStGeorges(george.value || ''));
 
-    // Add Bar Lotte gigs (placeholder for now - PDF parsing coming soon)
-    const barLotte = await parseBarLottePDF();
-    gigs.push(...barLotte);
-
     return gigs;
   } catch (e) {
     console.error('Error fetching gigs:', e.message);
@@ -227,181 +205,326 @@ async function fetchAllGigs() {
   }
 }
 
-async function parseBarLottePDF() {
+// ============ DATABASE OPERATIONS ============
+
+async function getOrCreateVenue(venueName) {
   try {
-    console.log('Bar Lotte gig fetching: PDF parsing not yet implemented - manual submission coming soon');
-    return [];
+    // Check if venue exists
+    const { data: existing } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('name', venueName)
+      .single();
+
+    if (existing) return existing.id;
+
+    // Create new venue
+    const venueId = uuidv4();
+    const { error } = await supabase
+      .from('venues')
+      .insert({ id: venueId, name: venueName, city: 'Bristol' });
+
+    if (error) {
+      console.error('Error creating venue:', error);
+      return null;
+    }
+
+    return venueId;
   } catch (e) {
-    console.error('Error parsing Bar Lotte PDF:', e.message);
-    return [];
+    console.error('Error with venue:', e);
+    return null;
   }
 }
 
-// ============ DATABASE OPERATIONS ============
+async function insertGigs(gigs) {
+  try {
+    for (const gig of gigs) {
+      const venueId = await getOrCreateVenue(gig.venue);
+      if (!venueId) continue;
 
-function insertGigs(gigs) {
-  return new Promise((resolve, reject) => {
-    // Insert gigs without deleting old ones - preserves data if a scraper fails
-    // Uses INSERT OR IGNORE to skip duplicates (same title + date + venue)
-    const stmt = db.prepare('INSERT OR IGNORE INTO gigs (title, date, venue, url, source, category, description) VALUES (?, ?, ?, ?, ?, ?, ?)');
+      const gigId = uuidv4();
+      const { error } = await supabase
+        .from('gigs')
+        .insert({
+          id: gigId,
+          venue_id: venueId,
+          title: gig.title,
+          date: gig.date,
+          genres: gig.genres,
+          ticket_url: gig.url,
+          description: gig.description,
+          source: gig.source
+        });
 
-    gigs.forEach(g => {
-      stmt.run([g.title, g.date, g.venue, g.url, g.source, g.category, g.description || ''], (err) => {
-        if (err) console.error('Insert error:', err);
-      });
-    });
+      if (error && !error.message.includes('duplicate')) {
+        console.error('Insert error:', error);
+      }
+    }
 
-    stmt.finalize((err) => {
-      if (err) return reject(err);
+    // Clean up old gigs
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: deleteError } = await supabase
+      .from('gigs')
+      .delete()
+      .lt('date', thirtyDaysAgo);
 
-      // Clean up gigs that are in the past (older than 30 days ago)
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      db.run('DELETE FROM gigs WHERE date < ?', [thirtyDaysAgo], (err) => {
-        if (err) console.error('Cleanup error:', err);
-        resolve();
-      });
-    });
-  });
+    if (deleteError) console.error('Cleanup error:', deleteError);
+  } catch (e) {
+    console.error('Error inserting gigs:', e.message);
+  }
 }
 
-function getGigs(filters = {}) {
-  return new Promise((resolve, reject) => {
-    // Start with all gigs
-    let query = 'SELECT * FROM gigs WHERE 1=1';
-    const params = [];
+async function getGigs(filters = {}) {
+  try {
+    let query = supabase
+      .from('gigs')
+      .select('id, title, date, ticket_url, description, source, genres, venues(name)');
 
-    // If venue is selected, ignore date filters but still apply genre filters
     const venueSelected = filters.venues && filters.venues.length > 0;
 
-    // Date filter (skip if venue selected)
+    // Date filters (skip if venue selected)
     if (!venueSelected && filters.startDate) {
-      query += ' AND date >= ?';
-      params.push(filters.startDate);
+      query = query.gte('date', filters.startDate);
     }
     if (!venueSelected && filters.endDate) {
-      query += ' AND date <= ?';
-      params.push(filters.endDate);
-    }
-
-    // Genre/Category filter (apply regardless of venue selection)
-    if (filters.genres && filters.genres.length > 0) {
-      const placeholders = filters.genres.map(() => '?').join(',');
-      query += ` AND category IN (${placeholders})`;
-      params.push(...filters.genres);
+      query = query.lte('date', filters.endDate);
     }
 
     // Search filter
     if (filters.search) {
-      const searchTerm = `%${filters.search}%`;
-      query += ' AND (title LIKE ? OR venue LIKE ? OR category LIKE ?)';
-      params.push(searchTerm, searchTerm, searchTerm);
+      const searchTerm = filters.search.toLowerCase();
+      // Note: Full text search would be better, but this works for MVP
+      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
     }
 
-    query += ' ORDER BY date ASC';
+    query = query.order('date', { ascending: true });
 
-    db.all(query, params, (err, rows) => {
-      if (err) return reject(err);
+    const { data: gigs, error } = await query;
 
-      // Get all gigs, filter out placeholder/unwanted entries, and apply venue filter in JavaScript
-      let results = (rows || []).filter(r => {
-        if (!r.venue) return false;
-        const venueLower = r.venue.toLowerCase();
-        const titleLower = r.title.toLowerCase();
+    if (error) {
+      console.error('Error fetching gigs:', error);
+      return [];
+    }
 
-        // Filter out unwanted entries
-        if (venueLower.includes('check venue')) return false;
-        if (venueLower.includes('celebrating nat king cole')) return false;
-        if (venueLower.includes('various venues')) return false;  // Filter out festival entries
-        if (titleLower.includes('celebrating nat king cole')) return false;
+    // Format results and apply filters in JavaScript
+    let results = (gigs || []).map(g => ({
+      id: g.id,
+      title: g.title,
+      date: g.date,
+      venue: g.venues?.name || 'Unknown Venue',
+      url: g.ticket_url,
+      source: g.source,
+      description: g.description,
+      categories: g.genres ? JSON.parse(g.genres) : []
+    }));
 
-        return true;
+    // Filter by genres
+    if (filters.genres && filters.genres.length > 0) {
+      results = results.filter(gig =>
+        gig.categories.some(cat => filters.genres.includes(cat))
+      );
+    }
+
+    // Filter by venue
+    if (filters.venues && filters.venues.length > 0) {
+      results = results.filter(gig =>
+        filters.venues.some(v => normalizeVenue(gig.venue) === normalizeVenue(v))
+      );
+    }
+
+    // Filter out bad entries
+    results = results.filter(r => {
+      const venueLower = r.venue.toLowerCase();
+      const titleLower = r.title.toLowerCase();
+      if (venueLower.includes('check venue')) return false;
+      if (venueLower.includes('celebrating nat king cole')) return false;
+      if (venueLower.includes('various venues')) return false;
+      if (titleLower.includes('celebrating nat king cole')) return false;
+      return true;
+    });
+
+    return results;
+  } catch (e) {
+    console.error('Error in getGigs:', e);
+    return [];
+  }
+}
+
+async function getVenues() {
+  try {
+    const { data: gigs, error } = await supabase
+      .from('gigs')
+      .select('venues(name)');
+
+    if (error) {
+      console.error('Error fetching venues:', error);
+      return [];
+    }
+
+    const venues = new Set();
+    (gigs || []).forEach(g => {
+      if (g.venues?.name) {
+        const normalized = normalizeVenue(g.venues.name);
+        const venueLower = normalized.toLowerCase();
+        if (!venueLower.includes('check') && !venueLower.includes('celebrating') && !venueLower.includes('various')) {
+          venues.add(normalized);
+        }
+      }
+    });
+
+    return Array.from(venues).sort();
+  } catch (e) {
+    console.error('Error in getVenues:', e);
+    return [];
+  }
+}
+
+async function getGenres() {
+  try {
+    const { data: gigs, error } = await supabase
+      .from('gigs')
+      .select('genres');
+
+    if (error) {
+      console.error('Error fetching genres:', error);
+      return [];
+    }
+
+    const genres = new Set();
+    (gigs || []).forEach(g => {
+      if (g.genres) {
+        try {
+          const parsed = JSON.parse(g.genres);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(genre => genres.add(genre));
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
+      }
+    });
+
+    return Array.from(genres).sort();
+  } catch (e) {
+    console.error('Error in getGenres:', e);
+    return [];
+  }
+}
+
+async function addInterest(gigId, userName, status = 'interested') {
+  try {
+    // Get or create user (temporary approach - will be replaced with proper auth in Phase 0b)
+    let { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', userName)
+      .single();
+
+    let userId = user?.id;
+    if (!userId) {
+      userId = uuidv4();
+      await supabase.from('users').insert({
+        id: userId,
+        email: `${userName.replace(/\s+/g, '.')}@temporary.local`,
+        username: userName,
+        password_hash: 'temp_user_no_password'
       });
+    }
 
-      // Venue filter - match after normalizing both sides
-      if (filters.venues && filters.venues.length > 0) {
-        results = results.filter(gig => {
-          const normalizedGigVenue = normalizeVenue(gig.venue);
-          return filters.venues.some(selectedVenue => {
-            const normalizedSelected = normalizeVenue(selectedVenue);
-            return normalizedGigVenue === normalizedSelected;
-          });
+    // Check if interest already exists
+    const { data: existing } = await supabase
+      .from('gig_interests')
+      .select('id')
+      .eq('gig_id', gigId)
+      .eq('user_id', userId)
+      .single();
+
+    if (existing) {
+      // Update existing interest
+      const { error } = await supabase
+        .from('gig_interests')
+        .update({ status })
+        .eq('id', existing.id);
+
+      if (error) {
+        console.error('Error updating interest:', error);
+        return { success: false, error: error.message };
+      }
+    } else {
+      // Insert new interest
+      const { error } = await supabase
+        .from('gig_interests')
+        .insert({
+          id: uuidv4(),
+          gig_id: gigId,
+          user_id: userId,
+          status
         });
+
+      if (error) {
+        console.error('Error inserting interest:', error);
+        return { success: false, error: error.message };
       }
+    }
 
-      // Normalize venue names in results
-      const normalized = results.map(r => ({...r, venue: normalizeVenue(r.venue)}));
-      resolve(normalized);
-    });
-  });
+    return { success: true };
+  } catch (e) {
+    console.error('Error in addInterest:', e);
+    return { success: false, error: e.message };
+  }
 }
 
-function getVenues() {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT DISTINCT venue FROM gigs ORDER BY venue', (err, rows) => {
-      if (err) return reject(err);
-      // Filter out unwanted venues and normalize
-      const venues = (rows || [])
-        .filter(r => {
-          const venueLower = r.venue.toLowerCase();
-          if (venueLower.includes('check')) return false;
-          if (venueLower.includes('celebrating')) return false;
-          if (venueLower.includes('various') || venueLower.includes('festival')) return false;
-          return true;
-        })
-        .map(r => normalizeVenue(r.venue));
-      // Remove duplicates
-      resolve([...new Set(venues)].sort());
-    });
-  });
+async function removeInterest(gigId, userName) {
+  try {
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', userName)
+      .single();
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    const { error } = await supabase
+      .from('gig_interests')
+      .delete()
+      .eq('gig_id', gigId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error removing interest:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (e) {
+    console.error('Error in removeInterest:', e);
+    return { success: false, error: e.message };
+  }
 }
 
-function getGenres() {
-  return new Promise((resolve, reject) => {
-    db.all('SELECT DISTINCT category FROM gigs WHERE category != "" ORDER BY category', (err, rows) => {
-      if (err) return reject(err);
-      resolve((rows || []).map(r => r.category).filter(c => c));
-    });
-  });
-}
+async function getInterested(gigId) {
+  try {
+    const { data, error } = await supabase
+      .from('gig_interests')
+      .select('users(username), status')
+      .eq('gig_id', gigId)
+      .order('created_at', { ascending: true });
 
-function addInterest(gigId, userName, status = 'interested') {
-  return new Promise((resolve, reject) => {
-    db.run(
-      'INSERT INTO interested (gig_id, user_name, status) VALUES (?, ?, ?) ON CONFLICT(gig_id, user_name) DO UPDATE SET status = excluded.status',
-      [gigId, userName, status],
-      function(err) {
-        if (err) return reject(err);
-        resolve({ success: true });
-      }
-    );
-  });
-}
+    if (error) {
+      console.error('Error fetching interested:', error);
+      return [];
+    }
 
-function removeInterest(gigId, userName) {
-  return new Promise((resolve, reject) => {
-    db.run(
-      'DELETE FROM interested WHERE gig_id = ? AND user_name = ?',
-      [gigId, userName],
-      function(err) {
-        if (err) return reject(err);
-        resolve({ success: true });
-      }
-    );
-  });
-}
-
-function getInterested(gigId) {
-  return new Promise((resolve, reject) => {
-    db.all(
-      'SELECT user_name, status FROM interested WHERE gig_id = ? ORDER BY created_at ASC',
-      [gigId],
-      (err, rows) => {
-        if (err) return reject(err);
-        const interested = (rows || []).map(r => ({ userName: r.user_name, status: r.status }));
-        resolve(interested);
-      }
-    );
-  });
+    return (data || []).map(item => ({
+      userName: item.users?.username || 'Unknown',
+      status: item.status
+    }));
+  } catch (e) {
+    console.error('Error in getInterested:', e);
+    return [];
+  }
 }
 
 // ============ ROUTES ============
@@ -453,12 +576,10 @@ app.post('/api/interested', async (req, res) => {
       return res.status(400).json({ error: 'Name cannot be empty' });
     }
 
-    // Limit name length to prevent abuse
     if (userName.length > 100) {
       return res.status(400).json({ error: 'Name too long (max 100 chars)' });
     }
 
-    // Validate status
     const validStatuses = ['interested', 'booked', 'going'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
@@ -475,7 +596,7 @@ app.get('/api/interested/:gigId', async (req, res) => {
   try {
     const gigId = req.params.gigId;
     const interested = await getInterested(gigId);
-    res.json({ gigId: parseInt(gigId), interested });
+    res.json({ gigId, interested });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -498,33 +619,19 @@ app.delete('/api/interested/:gigId/:userName', async (req, res) => {
 
 app.get('/api/attendance-summary', async (req, res) => {
   try {
-    // Get all gigs with interested users
-    const gigs = await new Promise((resolve, reject) => {
-      db.all('SELECT id, title, date, venue FROM gigs ORDER BY date ASC', async (err, rows) => {
-        if (err) return reject(err);
+    const gigs = await getGigs({});
 
-        // Get interested users for each gig
-        const gigsWithInterested = await Promise.all(
-          (rows || []).map(async gig => {
-            const interested = await getInterested(gig.id);
-            return { ...gig, interested };
-          })
-        );
-
-        resolve(gigsWithInterested);
-      });
-    });
-
-    // Get all unique user names and convert interested to proper format
     const allNames = new Set();
-    const formattedGigs = gigs.map(gig => {
-      const interestedList = gig.interested.map(item => ({ userName: item.userName, status: item.status }));
-      interestedList.forEach(item => allNames.add(item.userName));
-      return { ...gig, interested: interestedList };
-    });
+    const gigsWithInterested = await Promise.all(
+      gigs.map(async gig => {
+        const interested = await getInterested(gig.id);
+        interested.forEach(item => allNames.add(item.userName));
+        return { ...gig, interested };
+      })
+    );
 
     res.json({
-      gigs: formattedGigs,
+      gigs: gigsWithInterested,
       allNames: Array.from(allNames).sort()
     });
   } catch (e) {

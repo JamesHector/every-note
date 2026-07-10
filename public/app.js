@@ -187,7 +187,7 @@ function renderGigs(gigs) {
         <div id="interested-${gig.id}" class="gig-interested"></div>
         <div class="gig-footer">
           ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
-          <button id="status-btn-${gig.id}" class="btn btn-secondary" onclick="cycleStatus(${gig.id})">Interested</button>
+          <button id="status-btn-${gig.id}" class="btn btn-secondary" onclick="cycleStatus('${gig.id}')">Interested</button>
         </div>
       </div>
     `;
@@ -438,7 +438,7 @@ function renderCalendar(gigs) {
       <div style="font-weight: 600; margin-bottom: 4px;">${day}</div>`;
 
     daysGigs.forEach(gig => {
-      html += `<div class="calendar-chip" onclick="showGigPopup(${gig.id})">${escapeHtml(gig.title.substring(0, 20))}</div>`;
+      html += `<div class="calendar-chip" onclick="showGigPopup('${gig.id}')">${escapeHtml(gig.title.substring(0, 20))}</div>`;
     });
 
     html += '</div>';
