@@ -1,6 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const { createClient } = require('@supabase/supabase-js');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 // Supabase credentials
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -50,7 +50,7 @@ async function migrate() {
 
     console.log(`Creating ${uniqueVenues.length} venues...`);
     for (const venueName of uniqueVenues) {
-      const venueId = uuidv4();
+      const venueId = randomUUID();
       venueMap.set(venueName, venueId);
 
       const { error } = await supabase
@@ -73,7 +73,7 @@ async function migrate() {
     let gigMap = new Map(); // old gig id -> new gig id
 
     for (const gig of gigs) {
-      const newGigId = uuidv4();
+      const newGigId = randomUUID();
       const venueId = venueMap.get(gig.venue);
 
       const { error } = await supabase
@@ -109,7 +109,7 @@ async function migrate() {
 
       // For now, create a temporary user per username so we don't lose data
       // This will be replaced when proper auth is added
-      const tempUserId = uuidv4();
+      const tempUserId = randomUUID();
 
       const { error: userError } = await supabase
         .from('users')
@@ -137,7 +137,7 @@ async function migrate() {
       const { error: interestError } = await supabase
         .from('gig_interests')
         .insert({
-          id: uuidv4(),
+          id: randomUUID(),
           gig_id: newGigId,
           user_id: userId,
           status: interest.status || 'interested',

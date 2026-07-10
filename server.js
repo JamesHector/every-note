@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const https = require('https');
 const bodyParser = require('body-parser');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -219,7 +219,7 @@ async function getOrCreateVenue(venueName) {
     if (existing) return existing.id;
 
     // Create new venue
-    const venueId = uuidv4();
+    const venueId = randomUUID();
     const { error } = await supabase
       .from('venues')
       .insert({ id: venueId, name: venueName, city: 'Bristol' });
@@ -242,7 +242,7 @@ async function insertGigs(gigs) {
       const venueId = await getOrCreateVenue(gig.venue);
       if (!venueId) continue;
 
-      const gigId = uuidv4();
+      const gigId = randomUUID();
       const { error } = await supabase
         .from('gigs')
         .insert({
@@ -422,7 +422,7 @@ async function addInterest(gigId, userName, status = 'interested') {
 
     let userId = user?.id;
     if (!userId) {
-      userId = uuidv4();
+      userId = randomUUID();
       await supabase.from('users').insert({
         id: userId,
         email: `${userName.replace(/\s+/g, '.')}@temporary.local`,
@@ -455,7 +455,7 @@ async function addInterest(gigId, userName, status = 'interested') {
       const { error } = await supabase
         .from('gig_interests')
         .insert({
-          id: uuidv4(),
+          id: randomUUID(),
           gig_id: gigId,
           user_id: userId,
           status
