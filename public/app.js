@@ -5,6 +5,8 @@ let selectedGenres = [];
 let currentUserName = null;
 let currentView = 'grid';
 let currentCalendarDate = new Date();
+let currentGig = null;
+let gigsData = {};
 
 // Status progression and labels
 const STATUS_ORDER = [null, 'interested', 'booked', 'going'];
@@ -194,12 +196,19 @@ function renderGigs(gigs) {
           <button onclick="addAttendee('${gig.id}')" class="add-attendee-btn">+</button>
         </div>
         <div class="gig-footer">
+          <button class="btn btn-secondary" onclick="showGigDetails('${gig.id}')">Details</button>
           ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
           <button id="status-btn-${gig.id}" class="btn btn-secondary" onclick="cycleStatus('${gig.id}')">Interested</button>
         </div>
       </div>
     `;
   }).join('');
+
+  // Store gig data for modal access
+  gigsData = {};
+  gigs.forEach(gig => {
+    gigsData[gig.id] = gig;
+  });
 
   // Load interested users for each gig
   gigs.forEach(gig => {
@@ -356,6 +365,91 @@ function showAttendanceModal() {
 
 function closeAttendanceModal() {
   document.getElementById('attendanceModal').style.display = 'none';
+}
+
+function showGigDetails(gigId) {
+  const gig = gigsData[gigId];
+  if (gig) {
+    currentGig = gig;
+    displayGigDetails(gig);
+  }
+}
+
+function displayGigDetails(gig) {
+  const date = new Date(gig.date);
+  const dateStr = date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  const titleEl = document.getElementById('gigPopupTitle');
+  const contentEl = document.getElementById('gigPopupContent');
+
+  titleEl.textContent = escapeHtml(gig.title);
+
+  let html = `
+    <div style="margin-bottom: 20px;">
+      <div style="margin-bottom: 15px;">
+        <p style="margin: 0; color: #667eea; font-weight: 600; font-size: 1.1em;">${escapeHtml(gig.venue)}</p>
+        <p style="margin: 8px 0 0 0; color: #666;">
+          📅 ${dateStr}<br>
+          🕐 ${timeStr}
+        </p>
+      </div>
+
+      ${gig.categories && gig.categories.length > 0 ? `
+        <div style="margin-bottom: 15px;">
+          ${gig.categories.map(cat => `<span class="gig-category">${escapeHtml(cat)}</span>`).join('')}
+        </div>
+      ` : ''}
+
+      ${gig.description ? `
+        <div style="margin-bottom: 15px; line-height: 1.6; color: #555;">
+          <p style="margin: 0; font-weight: 600; margin-bottom: 8px; color: #333;">Details</p>
+          <p style="margin: 0;">${escapeHtml(gig.description)}</p>
+        </div>
+      ` : ''}
+
+      ${gig.source ? `
+        <p style="margin: 0; font-size: 0.9em; color: #999;">Source: ${escapeHtml(gig.source)}</p>
+      ` : ''}
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets available</button>'}
+      <button onclick="shareGig()" class="btn btn-secondary">Share</button>
+    </div>
+  `;
+
+  contentEl.innerHTML = html;
+  document.getElementById('gigPopup').style.display = 'flex';
+}
+
+function closeGigPopup() {
+  document.getElementById('gigPopup').style.display = 'none';
+  currentGig = null;
+}
+
+function shareGig() {
+  if (!currentGig) return;
+
+  const date = new Date(currentGig.date);
+  const dateStr = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' });
+  const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const text = `🎵 ${currentGig.title}\n📍 ${currentGig.venue}\n📅 ${dateStr} at ${timeStr}\n🎫 ${currentGig.url || 'Check website for tickets'}\n\nVia Every Note`;
+
+  if (navigator.share) {
+    navigator.share({
+      title: currentGig.title,
+      text: text
+    }).catch(e => console.log('Share cancelled'));
+  } else {
+    // Fallback: copy to clipboard
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Gig details copied to clipboard!');
+    }).catch(e => {
+      alert('Could not copy to clipboard');
+    });
+  }
 }
 
 function loadAttendanceSummary() {
