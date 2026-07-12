@@ -619,7 +619,12 @@ app.delete('/api/interested/:gigId/:userName', async (req, res) => {
 
 app.get('/api/attendance-summary', async (req, res) => {
   try {
-    const gigs = await getGigs({});
+    // Filter to show only gigs from today onwards
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = today.toISOString().split('T')[0];
+
+    const gigs = await getGigs({ startDate });
 
     const allNames = new Set();
     const gigsWithInterested = await Promise.all(
