@@ -183,7 +183,7 @@ function renderGigs(gigs) {
           <span style="color: #999;">at ${timeStr}</span>
         </div>
         ${gig.category ? `<div class="gig-category">${escapeHtml(gig.category)}</div>` : ''}
-        <div id="interested-${gig.id}" class="gig-interested">👥 Loading...</div>
+        <div id="interested-${gig.id}" class="gig-interested"></div>
         <div class="gig-footer">
           ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
           <button id="status-btn-${gig.id}" class="btn btn-secondary" onclick="cycleStatus('${gig.id}')">Interested</button>
