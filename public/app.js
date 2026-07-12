@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initializeUser();
   await loadVenues();
   await loadGenres();
-  await loadGigs();
 
   // Setup event listeners
   document.getElementById('searchBox').addEventListener('input', debounce(loadGigs, 300));
