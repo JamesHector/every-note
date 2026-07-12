@@ -184,17 +184,14 @@ function renderGigs(gigs) {
         </div>
         ${gig.category ? `<div class="gig-category">${escapeHtml(gig.category)}</div>` : ''}
         <div id="interested-${gig.id}" class="gig-interested"></div>
-        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
-          <div style="font-size: 0.85em; color: #666; margin-bottom: 8px;">Add someone:</div>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <input type="text" id="add-name-${gig.id}" placeholder="Name" style="flex: 1; min-width: 100px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em;">
-            <select id="add-status-${gig.id}" style="padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em;">
-              <option value="interested">Interested</option>
-              <option value="booked">Booked</option>
-              <option value="going">Going</option>
-            </select>
-            <button onclick="addAttendee('${gig.id}')" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.9em;">+</button>
-          </div>
+        <div class="add-attendee-form">
+          <input type="text" id="add-name-${gig.id}" placeholder="Add someone..." class="add-attendee-input">
+          <select id="add-status-${gig.id}" class="add-attendee-select">
+            <option value="interested">Interested</option>
+            <option value="booked">Booked</option>
+            <option value="going">Going</option>
+          </select>
+          <button onclick="addAttendee('${gig.id}')" class="add-attendee-btn">+</button>
         </div>
         <div class="gig-footer">
           ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
