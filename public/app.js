@@ -407,10 +407,6 @@ function displayGigDetails(gig) {
           <p style="margin: 0;">${escapeHtml(gig.description)}</p>
         </div>
       ` : ''}
-
-      ${gig.source ? `
-        <p style="margin: 0; font-size: 0.9em; color: #999;">Source: ${escapeHtml(gig.source)}</p>
-      ` : ''}
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 20px;">
