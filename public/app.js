@@ -462,21 +462,35 @@ function shareGig() {
   const dateStr = date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' });
   const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  const text = `🎵 ${currentGig.title}\n📍 ${currentGig.venue}\n📅 ${dateStr} at ${timeStr}\n🎫 ${currentGig.url || 'Check website for tickets'}\n\nVia Every Note`;
+  // Fetch attendees for sharing
+  fetch(`/api/interested/${currentGig.id}`)
+    .then(res => res.json())
+    .then(data => {
+      let attendeeText = '';
+      if (data.interested && data.interested.length > 0) {
+        const attendeeList = data.interested
+          .map(item => `${item.userName} (${STATUS_LABELS[item.status] || 'Interested'})`)
+          .join(', ');
+        attendeeText = `\n👥 ${attendeeList}`;
+      }
 
-  if (navigator.share) {
-    navigator.share({
-      title: currentGig.title,
-      text: text
-    }).catch(e => console.log('Share cancelled'));
-  } else {
-    // Fallback: copy to clipboard
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Gig details copied to clipboard!');
-    }).catch(e => {
-      alert('Could not copy to clipboard');
-    });
-  }
+      const text = `🎵 ${currentGig.title}\n📍 ${currentGig.venue}\n📅 ${dateStr} at ${timeStr}${attendeeText}\n🎫 ${currentGig.url || 'Check website for tickets'}\n\nVia Every Note`;
+
+      if (navigator.share) {
+        navigator.share({
+          title: currentGig.title,
+          text: text
+        }).catch(e => console.log('Share cancelled'));
+      } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(text).then(() => {
+          alert('Gig details copied to clipboard!');
+        }).catch(e => {
+          alert('Could not copy to clipboard');
+        });
+      }
+    })
+    .catch(e => console.error('Error sharing gig:', e));
 }
 
 function loadAttendanceSummary() {
