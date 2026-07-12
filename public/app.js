@@ -197,7 +197,7 @@ function renderGigs(gigs) {
         </div>
         <div class="gig-footer">
           <button class="btn btn-secondary" onclick="showGigDetails('${gig.id}')">Details</button>
-          ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
+          ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Venue / Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets link</button>'}
           <button id="status-btn-${gig.id}" class="btn btn-secondary" onclick="cycleStatus('${gig.id}')">Interested</button>
         </div>
       </div>
@@ -415,7 +415,7 @@ function displayGigDetails(gig) {
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 20px;">
-      ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Book Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets available</button>'}
+      ${gig.url ? `<a href="${escapeHtml(gig.url)}" target="_blank" class="btn btn-primary">Venue / Tickets</a>` : '<button class="btn btn-primary" disabled>No tickets available</button>'}
       <button onclick="shareGig()" class="btn btn-secondary">Share</button>
     </div>
   `;
