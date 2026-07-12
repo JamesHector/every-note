@@ -407,6 +407,11 @@ function displayGigDetails(gig) {
           <p style="margin: 0;">${escapeHtml(gig.description)}</p>
         </div>
       ` : ''}
+
+      <div id="gigDetailsAttendees" style="margin-bottom: 15px;">
+        <p style="margin: 0; font-weight: 600; margin-bottom: 8px; color: #333;">Who's Going</p>
+        <p style="margin: 0; color: #999;">Loading...</p>
+      </div>
     </div>
 
     <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -417,6 +422,32 @@ function displayGigDetails(gig) {
 
   contentEl.innerHTML = html;
   document.getElementById('gigPopup').style.display = 'flex';
+
+  // Load attendees
+  fetch(`/api/interested/${gig.id}`)
+    .then(res => res.json())
+    .then(data => {
+      const attendeesEl = document.getElementById('gigDetailsAttendees');
+      if (data.interested && data.interested.length > 0) {
+        const attendeeList = data.interested
+          .map(item => {
+            const statusLabel = STATUS_LABELS[item.status] || 'Interested';
+            const statusColor = STATUS_COLORS[item.status] || '#f0f0f0';
+            return `<span class="status-badge" style="background: ${statusColor}; margin-right: 8px; margin-bottom: 8px; display: inline-block;">${escapeHtml(item.userName)} (${statusLabel})</span>`;
+          })
+          .join('');
+        attendeesEl.innerHTML = `
+          <p style="margin: 0; font-weight: 600; margin-bottom: 8px; color: #333;">Who's Going</p>
+          <div>${attendeeList}</div>
+        `;
+      } else {
+        attendeesEl.innerHTML = `
+          <p style="margin: 0; font-weight: 600; margin-bottom: 8px; color: #333;">Who's Going</p>
+          <p style="margin: 0; color: #999;">No one yet</p>
+        `;
+      }
+    })
+    .catch(e => console.error('Error loading attendees:', e));
 }
 
 function closeGigPopup() {
