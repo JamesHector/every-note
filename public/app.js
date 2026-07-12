@@ -236,6 +236,9 @@ function loadInterestedUsers(gigId) {
           }
         }
       } else {
+        if (container) {
+          container.innerHTML = '';
+        }
         if (statusBtn) {
           statusBtn.textContent = 'Interested';
           statusBtn.style.background = '#f0f0f0';
